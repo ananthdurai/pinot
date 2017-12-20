@@ -40,5 +40,6 @@ public class MinionConstants {
   // Purges rows inside segment that match chosen criteria
   public static class PurgeTask {
     public static final String TASK_TYPE = "PurgeTask";
+    public static final String PURGE_TIME = "purge.time";
   }
 }

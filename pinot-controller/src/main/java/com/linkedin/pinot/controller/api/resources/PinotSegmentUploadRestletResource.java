@@ -30,6 +30,7 @@ import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.FileUploadUtils;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
+import com.linkedin.pinot.common.utils.UserAgentHeader;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.common.utils.time.TimeUtils;
 import com.linkedin.pinot.controller.ControllerConf;
@@ -40,6 +41,7 @@ import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineSt
 import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
 import com.linkedin.pinot.controller.util.TableSizeReader;
 import com.linkedin.pinot.controller.validation.StorageQuotaChecker;
+import com.linkedin.pinot.core.common.MinionConstants;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -426,16 +428,24 @@ public class PinotSegmentUploadRestletResource {
       return response;
     }
 
-    final OfflineSegmentZKMetadata originalOfflineSegmentZkMetadata = new OfflineSegmentZKMetadata(znRecord);
+    OfflineSegmentZKMetadata originalOfflineSegmentZkMetadata = new OfflineSegmentZKMetadata(znRecord);
 
     long minionExpectedCrc = -1L;
     boolean isMinionConfigured = offlineTableConfig.getTaskConfig() != null;
-    boolean minionHeaderPresent = headers.getHeaderString(HttpHeaders.USER_AGENT).contains(CommonConstants.Minion.MINION_HEADER);
+    String userAgentHeader = headers.getHeaderString(HttpHeaders.USER_AGENT);
+    boolean minionHeaderPresent = userAgentHeader.contains(CommonConstants.Minion.MINION_HEADER_PREFIX);
+    String taskType = UserAgentHeader.getTaskType(userAgentHeader);
     boolean metadataRewritten = false;
+
     if (isMinionConfigured) {
       // Minion configured use case so that we write to zk sparingly
       String segmentPushStatus = originalOfflineSegmentZkMetadata.getSegmentPushStatus();
       SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd'T'HH:mm:ss.SSS");
+
+      if (taskType.equals(MinionConstants.PurgeTask.TASK_TYPE)) {
+        // Add purge time
+        originalOfflineSegmentZkMetadata.getCustomFields().put(MinionConstants.PurgeTask.PURGE_TIME, String.valueOf(System.currentTimeMillis()));
+      }
 
       if (segmentPushStatus != null) {
         Date originalSegmentHumanReadableTime = getHumanReadableTimeFromSegmentPushStatus(segmentPushStatus, sdf);
